@@ -1,0 +1,53 @@
+<script type="text/javascript">
+    RED.nodes.registerType('price-timer',{
+        category: 'function',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "file.png",
+        label: function() {
+            return this.name||"price-timer";
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="price-timer">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-hours"><i class="fa fa-tag"></i> Hours</label>
+        <input type="number" id="node-input-hours" placeholder="0">
+    </div>
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
+        <input type="text" id="node-input-topic" placeholder="my/topic">
+    </div>
+    <div class="form-row">
+        <label for="node-input-startvalue"><i class="fa fa-tag"></i> On-value</label>
+        <input type="text" id="node-input-startvalue" placeholder="on">
+    </div>
+    <div class="form-row">
+        <label for="node-input-stopvalue"><i class="fa fa-tag"></i> Off value</label>
+        <input type="text" id="node-input-stopvalue" placeholder="off">
+    </div>
+    <div class="form-row">
+        <label for="node-input-pricecap"><i class="fa fa-tag"></i> Price cap, hours over this price will not be active</label>
+        <input type="number" id="node-input-pricecap">
+    </div>
+    <div class="form-row">
+        <label for="node-input-minhours"><i class="fa fa-tag"></i> Minimum amout of hours that to be active. Overrides price cap.</label>
+        <input type="number" id="node-input-minhours" placeholder="0">
+    </div>
+</script>
+
+
+<script type="text/html" data-help-name="price-timer">
+    <p>A node that checks when to start and stop loads, depending och price informatin</p>
+</script>
+
