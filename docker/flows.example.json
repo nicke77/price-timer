@@ -1,0 +1,124 @@
+[
+    {
+        "id": "pricetimerflow",
+        "type": "tab",
+        "label": "price-timer dev",
+        "disabled": false,
+        "info": "Sample flow for node-red-contrib-price-timer. Click the inject node to run price-timer."
+    },
+    {
+        "id": "samplepricesinject",
+        "type": "inject",
+        "z": "pricetimerflow",
+        "name": "sample prices",
+        "props": [
+            {
+                "p": "prices",
+                "v": "{\"spotprice\":[450,420,380,350,330,400,550,700,800,750,600,500,480,520,650,900,1100,1000,850,700,550,480,420,360]}",
+                "vt": "json"
+            },
+            {
+                "p": "hours",
+                "v": "8",
+                "vt": "num"
+            },
+            {
+                "p": "priceCap",
+                "v": "500",
+                "vt": "num"
+            },
+            {
+                "p": "minHours",
+                "v": "2",
+                "vt": "num"
+            },
+            {
+                "p": "topic",
+                "v": "myhome/heating",
+                "vt": "str"
+            },
+            {
+                "p": "startValue",
+                "v": "on",
+                "vt": "str"
+            },
+            {
+                "p": "stopValue",
+                "v": "off",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 140,
+        "wires": [
+            [
+                "pricetimerdev"
+            ]
+        ]
+    },
+    {
+        "id": "pricetimerdev",
+        "type": "price-timer",
+        "z": "pricetimerflow",
+        "name": "dev",
+        "prices": "",
+        "prices-type": "json",
+        "hours": 8,
+        "topic": "myhome/heating",
+        "startValue": "on",
+        "startValue-type": "str",
+        "stopValue": "off",
+        "stopValue-type": "str",
+        "priceCap": 500,
+        "minHours": 2,
+        "x": 420,
+        "y": 140,
+        "wires": [
+            [
+                "scheduledebug"
+            ],
+            [
+                "controldebug"
+            ]
+        ]
+    },
+    {
+        "id": "scheduledebug",
+        "type": "debug",
+        "z": "pricetimerflow",
+        "name": "schedule",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "controldebug",
+        "type": "debug",
+        "z": "pricetimerflow",
+        "name": "on/off",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 650,
+        "y": 180,
+        "wires": []
+    }
+]

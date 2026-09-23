@@ -1,0 +1,8 @@
+{
+  "watch": ["/src/node-red-contrib-price-timer"],
+  "ext": "js,html,json",
+  "ignore": ["**/node_modules/**", "docker/**", ".git/**"],
+  "delay": 1000,
+  "signal": "SIGTERM",
+  "exec": "node --inspect=0.0.0.0:9229 ./node_modules/node-red/red.js --userDir /data"
+}

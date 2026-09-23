@@ -1,0 +1,20 @@
+services:
+  node-red:
+    build: .
+    image: price-timer-node-red
+    container_name: price-timer-node-red
+    init: true
+    ports:
+      - "127.0.0.1:1880:1880"
+      - "127.0.0.1:9229:9229"
+    environment:
+      TZ: Europe/Stockholm
+    volumes:
+      - ./docker/data:/data
+      - ./docker/settings.js:/data/settings.js:ro
+      - ./docker/nodemon.json:/opt/dev/nodemon.json:ro
+      - ./docker/dev-entrypoint.sh:/opt/dev/dev-entrypoint.sh:ro
+      - ./docker/flows.example.json:/opt/dev/flows.example.json:ro
+      # Live source. Edits on the host are what the runtime loads.
+      - .:/src/node-red-contrib-price-timer
+    entrypoint: ["/bin/bash", "/opt/dev/dev-entrypoint.sh"]

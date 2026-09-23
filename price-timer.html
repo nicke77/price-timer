@@ -1,53 +1,158 @@
-<script type="text/javascript">
+<script type='text/javascript'>
     RED.nodes.registerType('price-timer',{
         category: 'function',
         color: '#a6bbcf',
         defaults: {
-            name: {value:""}
+            name: {value: ''},
+            prices: {
+                value: '',
+                required: false,
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    try {
+                        var parsed = typeof v === 'string' ? JSON.parse(v) : v;
+                        return Array.isArray(parsed) || (parsed && Array.isArray(parsed.spotprice));
+                    } catch (e) {
+                        return false;
+                    }
+                }
+            },
+            hours:{value: 8, validate:RED.validators.number() },
+            topic: {value: ''},
+            startValue: {value: 'on'},
+            stopValue: {value: 'off'},
+            priceCap: {
+                value: '',
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    return RED.validators.number()(v);
+                }
+            },
+            minHours: {value:0, validate:RED.validators.number() }
         },
         inputs:1,
-        outputs:1,
-        icon: "file.png",
+        outputs:2,
+        icon: 'font-awesome/fa-money',
         label: function() {
-            return this.name||"price-timer";
+            return this.name||'price-timer';
+        },
+        oneditprepare: function () {
+            $('#node-input-prices').typedInput(
+            {
+                type:'json',
+                types:['json'],
+                typeField: '#node-input-prices-type'
+            })
+            $('#node-input-hours').typedInput(
+            {
+                type:'num',
+                types:['num'],
+                typeField: '#node-input-hours-type'
+            })
+            $('#node-input-startValue').typedInput(
+            {
+                type:'str',
+                types:['str','num','bool','json','bin','jsonata','date','env'],
+                typeField: '#node-input-startValue-type'
+            })
+            $('#node-input-stopValue').typedInput(
+            {
+                type:'str',
+                types:['str','num','bool','json','bin','jsonata','date','env'],
+                typeField: '#node-input-stopValue-type'
+            })
         }
     });
 </script>
 
-<script type="text/html" data-template-name="price-timer">
-    <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="Name">
+<script type='text/html' data-template-name='price-timer'>
+    <div class='form-row'>
+        <label for='node-input-name'><i class='fa fa-tag'></i> Name</label>
+        <input type='text' id='node-input-name' placeholder='Name'>
     </div>
 
-    <div class="form-row">
-        <label for="node-input-hours"><i class="fa fa-tag"></i> Hours</label>
-        <input type="number" id="node-input-hours" placeholder="0">
+    <div class='form-row'>
+        <label title='Optional default prices. Leave empty to use msg.prices from the input message.' for='node-input-prices'><i class='fa fa-money'></i> Prices</label>
+        <input type='text' id='node-input-prices' placeholder='use msg.prices'>
+        <input type='hidden' id='node-input-prices-type'>
     </div>
-    <div class="form-row">
-        <label for="node-input-topic"><i class="fa fa-tag"></i> Topic</label>
-        <input type="text" id="node-input-topic" placeholder="my/topic">
+    <div class='form-row'>
+        <label title='The topic the load listens to' for='node-input-topic'><i class='fa fa-tasks'></i> Topic</label>
+        <input type='text' id='node-input-topic' placeholder='my/topic'>
     </div>
-    <div class="form-row">
-        <label for="node-input-startvalue"><i class="fa fa-tag"></i> On-value</label>
-        <input type="text" id="node-input-startvalue" placeholder="on">
+    <div class='form-row'>
+        <label title='Demanded number of hours.' for='node-input-hours'><i class='fa fa-clock-o'></i> Hours</label>
+        <input type='number' id='node-input-hours' placeholder='0'>
     </div>
-    <div class="form-row">
-        <label for="node-input-stopvalue"><i class="fa fa-tag"></i> Off value</label>
-        <input type="text" id="node-input-stopvalue" placeholder="off">
+    <div class='form-row'>
+        <label title='The value that will be sent to <topic> for turning on the load' for='node-input-startvalue'><i class='fa fa-sun-o'></i> On-value</label>
+        <input type='text' id='node-input-startValue' placeholder='on'>
+        <input type='hidden' id='node-input-startValue-type'>
     </div>
-    <div class="form-row">
-        <label for="node-input-pricecap"><i class="fa fa-tag"></i> Price cap, hours over this price will not be active</label>
-        <input type="number" id="node-input-pricecap">
+    <div class='form-row'>
+        <label title='The value that will be sent to <topic> for shutting off the load' for='node-input-stopvalue'><i class='fa fa-power-off'></i> Off value</label>
+        <input type='text' id='node-input-stopValue'>
+        <input type='hidden' id='node-input-stopValue-type'>
     </div>
-    <div class="form-row">
-        <label for="node-input-minhours"><i class="fa fa-tag"></i> Minimum amout of hours that to be active. Overrides price cap.</label>
-        <input type="number" id="node-input-minhours" placeholder="0">
+    <div class='form-row'>
+        <label title='Hours over this price will not activate the load unless Min. hours is not reached. Leave empty for no cap. Use the same unit as the price series.' for='node-input-pricecap'><i class='fa fa-money'></i> Price cap</label>
+        <input type='number' id='node-input-priceCap' placeholder='no cap'>
+    </div>
+    <div class='form-row'>
+        <label title='Minimum amount of hours that must be active. Overrides price cap.' for='node-input-minhours'><i class='fa fa-clock-o'></i> Min. hours</label>
+        <input type='number' id='node-input-minHours' placeholder='0'>
     </div>
 </script>
 
 
-<script type="text/html" data-help-name="price-timer">
-    <p>A node that checks when to start and stop loads, depending och price informatin</p>
-</script>
+<script type='text/html' data-help-name='price-timer'>
+    <p>Plans when a load should run from a 24-hour spot price series. <b>Only an input message produces an output</b>, so trigger the node at the times and frequency you need.</p>
+    <h3>Inputs</h3>
+    <dl class='message-properties'>
+        <dt>prices <span class='property-type'>array | object</span></dt>
+        <dd>A 24-hour price series (numeric array, or <code>{ spotprice: [...] }</code>). Prefer this over the optional Prices property on the node.</dd>
+        <dt class='optional'>hours <span class='property-type'>number</span></dt>
+        <dd>Overrides the Hours configured on the node.</dd>
+        <dt class='optional'>topic <span class='property-type'>string</span></dt>
+        <dd>Overrides the Topic configured on the node. Used on output 2.</dd>
+        <dt class='optional'>startValue <span class='property-type'>any</span></dt>
+        <dd>Overrides the On-value configured on the node. Sent as <code>msg.payload</code> on output 2 when the load should run.</dd>
+        <dt class='optional'>stopValue <span class='property-type'>any</span></dt>
+        <dd>Overrides the Off-value configured on the node. Sent as <code>msg.payload</code> on output 2 when the load should stop.</dd>
+        <dt class='optional'>priceCap <span class='property-type'>number</span></dt>
+        <dd>Overrides the Price cap configured on the node. Same unit as the price series. Empty or omitted means no cap.</dd>
+        <dt class='optional'>minHours <span class='property-type'>number</span></dt>
+        <dd>Overrides the Min. hours configured on the node. Forces that many hours even above the price cap.</dd>
+    </dl>
 
+ <h3>Outputs</h3>
+     <ol class='node-ports'>
+         <li>Information output
+             <dl class='message-properties'>
+                 <dt>payload <span class='property-type'>object</span></dt>
+                 <dd>Schedule details: prices, requested hours, selected slots, hours below the price cap, and start/stop windows.</dd>
+             </dl>
+         </li>
+         <li>Control output
+             <dl class='message-properties'>
+                 <dt>payload <span class='property-type'>any</span></dt>
+                 <dd>The On-value or Off-value for the current time.</dd>
+                 <dt>topic <span class='property-type'>string</span></dt>
+                 <dd>The topic from the message or the node configuration.</dd>
+             </dl>
+         </li>
+     </ol>
+
+<h3>Details</h3>
+    <p>If an optional message property is missing, the matching node setting is used for topic, On-value, Off-value, hours, price cap, and min hours.</p>
+    <p>Leave Price cap empty for no limit. When set, samples above the cap are skipped unless Min. hours requires them. The cap uses the same unit as the price series.</p>
+
+<h3>References</h3>
+    <ul>
+        <li><a href="https://github.com/nicke77/price-timer">GitHub</a> - the node repository</li>
+    </ul>
+</script>
