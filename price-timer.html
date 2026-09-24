@@ -32,6 +32,15 @@
                     return RED.validators.number()(v);
                 }
             },
+            priceLevel: {
+                value: '',
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    return RED.validators.number()(v);
+                }
+            },
             minHours: {value:0, validate:RED.validators.number() }
         },
         inputs:1,
@@ -103,6 +112,10 @@
         <input type='number' id='node-input-priceCap' placeholder='no cap'>
     </div>
     <div class='form-row'>
+        <label title='If the price stays at or below this level for longer than Hours, the load runs for the whole time it is at or below the level. Leave empty to only run the cheapest Hours.' for='node-input-pricelevel'><i class='fa fa-money'></i> Price level</label>
+        <input type='number' id='node-input-priceLevel' placeholder='disabled'>
+    </div>
+    <div class='form-row'>
         <label title='Minimum amount of hours that must be active. Overrides price cap.' for='node-input-minhours'><i class='fa fa-clock-o'></i> Min. hours</label>
         <input type='number' id='node-input-minHours' placeholder='0'>
     </div>
@@ -125,6 +138,8 @@
         <dd>Overrides the Off-value configured on the node. Sent as <code>msg.payload</code> on output 2 when the load should stop.</dd>
         <dt class='optional'>priceCap <span class='property-type'>number</span></dt>
         <dd>Overrides the Price cap configured on the node. Same unit as the price series. Empty or omitted means no cap.</dd>
+        <dt class='optional'>priceLevel <span class='property-type'>number</span></dt>
+        <dd>Overrides the Price level configured on the node. If the series stays at or below this level for longer than <code>hours</code>, the load runs for every sample at or below the level. Empty or omitted disables this.</dd>
         <dt class='optional'>minHours <span class='property-type'>number</span></dt>
         <dd>Overrides the Min. hours configured on the node. Forces that many hours even above the price cap.</dd>
     </dl>
@@ -134,7 +149,7 @@
          <li>Information output
              <dl class='message-properties'>
                  <dt>payload <span class='property-type'>object</span></dt>
-                 <dd>Schedule details: prices, requested hours, selected slots, hours below the price cap, and start/stop windows.</dd>
+                 <dd>Schedule details: prices, requested hours, selected slots, hours below the price cap, hours below the price level, whether the schedule was extended, and start/stop windows.</dd>
              </dl>
          </li>
          <li>Control output
@@ -148,8 +163,9 @@
      </ol>
 
 <h3>Details</h3>
-    <p>If an optional message property is missing, the matching node setting is used for topic, On-value, Off-value, hours, price cap, and min hours.</p>
+    <p>If an optional message property is missing, the matching node setting is used for topic, On-value, Off-value, hours, price cap, price level, and min hours.</p>
     <p>Leave Price cap empty for no limit. When set, samples above the cap are skipped unless Min. hours requires them. The cap uses the same unit as the price series.</p>
+    <p>Leave Price level empty to always pick the cheapest hours. When it is set and the price is at or below that level for longer than Hours, every such sample is active, including samples above the price cap. If that stretch is not longer than Hours, the usual cheapest-hours schedule is used. Min. hours still forces extra cheapest samples if the extended stretch is shorter than that minimum.</p>
 
 <h3>References</h3>
     <ul>

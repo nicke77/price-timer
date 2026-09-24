@@ -33,6 +33,7 @@ module.exports = function(RED) {
 			sampleCount = spotprice.length;
 			var samplesPerHour = sampleCount / 24;
 			var priceCap = msg.priceCap != null && msg.priceCap !== '' ? msg.priceCap : config.priceCap;
+			var priceLevel = msg.priceLevel != null && msg.priceLevel !== '' ? msg.priceLevel : config.priceLevel;
 			var minHours = msg.minHours != null && msg.minHours !== '' ? msg.minHours : config.minHours;
 			var topic = msg.topic != null && msg.topic !== '' ? msg.topic : config.topic;
 			var startValue = msg.startValue != null && msg.startValue !== '' ? msg.startValue : config.startValue;
@@ -40,20 +41,48 @@ module.exports = function(RED) {
 			ret.payload.prices = prices;
 			ret.payload.nbrOfHours = msg.hours != null && msg.hours !== '' ? msg.hours : config.hours;
 			ret.payload.price_cap = priceCap != null && priceCap !== '' ? priceCap : Infinity;
+			var hasPriceLevel = priceLevel != null && priceLevel !== '';
+			ret.payload.priceLevel = hasPriceLevel ? priceLevel : null;
 			ret.payload.min_hours = minHours || 0;
 			var samplesBelowPriceCap = below_price_cap(spotprice, ret.payload.price_cap);
 			ret.payload.hoursBelowPriceCap = samplesBelowPriceCap / samplesPerHour;
-			var hours = ret.payload.hoursBelowPriceCap<ret.payload.nbrOfHours?ret.payload.hoursBelowPriceCap:ret.payload.nbrOfHours;
-			if (hours < ret.payload.min_hours)
+			var levelIndexes = hasPriceLevel ? indexesAtOrBelow(spotprice, priceLevel) : [];
+			ret.payload.hoursBelowPriceLevel = hasPriceLevel ? levelIndexes.length / samplesPerHour : null;
+			var requestedSamples = Math.round(Number(ret.payload.nbrOfHours) * samplesPerHour);
+			if (requestedSamples > sampleCount)
 			{
-			    hours = ret.payload.min_hours;
+			    requestedSamples = sampleCount;
 			}
-			var samples = Math.round(hours * samplesPerHour);
-			if (samples > sampleCount)
+			if (requestedSamples < 0)
 			{
-			    samples = sampleCount;
+			    requestedSamples = 0;
 			}
-			ret.payload.slots = getLowestIndexes(spotprice, samples);
+			ret.payload.extended = hasPriceLevel && levelIndexes.length > requestedSamples;
+			if (ret.payload.extended)
+			{
+			    var minSamples = Math.round(Number(ret.payload.min_hours) * samplesPerHour);
+			    if (minSamples > sampleCount)
+			    {
+			        minSamples = sampleCount;
+			    }
+			    ret.payload.slots = levelIndexes.length < minSamples
+			        ? padCheapest(spotprice, levelIndexes, minSamples)
+			        : levelIndexes.slice();
+			}
+			else
+			{
+			    var hours = ret.payload.hoursBelowPriceCap<ret.payload.nbrOfHours?ret.payload.hoursBelowPriceCap:ret.payload.nbrOfHours;
+			    if (hours < ret.payload.min_hours)
+			    {
+			        hours = ret.payload.min_hours;
+			    }
+			    var samples = Math.round(hours * samplesPerHour);
+			    if (samples > sampleCount)
+			    {
+			        samples = sampleCount;
+			    }
+			    ret.payload.slots = getLowestIndexes(spotprice, samples);
+			}
 			ret.payload.startStop=times(ret.payload.slots, topic);
 			ret.startStopArray = startStopArray(ret.payload.slots);
 
@@ -76,6 +105,51 @@ module.exports = function(RED) {
 				}
 		    }
 		    return ret;
+		}
+
+		function indexesAtOrBelow(arr, level)
+		{
+		    var ret = [];
+		    for (let i = 0; i < arr.length; i++)
+		    {
+		        if (arr[i] <= level)
+		        {
+		            ret.push(i);
+		        }
+		    }
+		    return ret;
+		}
+
+		function padCheapest(arr, selected, target)
+		{
+		    var chosen = {};
+		    var result = selected.slice();
+		    for (let i = 0; i < result.length; i++)
+		    {
+		        chosen[result[i]] = true;
+		    }
+		    var order = [];
+		    for (let i = 0; i < arr.length; i++)
+		    {
+		        order.push(i);
+		    }
+		    order.sort(function(a, b) {
+		        if (arr[a] !== arr[b])
+		        {
+		            return arr[a] - arr[b];
+		        }
+		        return a - b;
+		    });
+		    for (let i = 0; i < order.length && result.length < target; i++)
+		    {
+		        if (!chosen[order[i]])
+		        {
+		            chosen[order[i]] = true;
+		            result.push(order[i]);
+		        }
+		    }
+		    result.sort(function(a, b) { return a - b; });
+		    return result;
 		}
 
 

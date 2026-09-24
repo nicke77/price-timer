@@ -4,7 +4,7 @@
         "type": "tab",
         "label": "price-timer dev",
         "disabled": false,
-        "info": "Sample flow for node-red-contrib-price-timer. Click the inject node to run price-timer."
+        "info": "Sample flow for node-red-contrib-price-timer. Click the inject node to run price-timer. priceLevel 480 is below the series for longer than 8 hours, so the schedule covers that whole stretch."
     },
     {
         "id": "samplepricesinject",
@@ -25,6 +25,11 @@
             {
                 "p": "priceCap",
                 "v": "500",
+                "vt": "num"
+            },
+            {
+                "p": "priceLevel",
+                "v": "480",
                 "vt": "num"
             },
             {
@@ -75,6 +80,7 @@
         "stopValue": "off",
         "stopValue-type": "str",
         "priceCap": 500,
+        "priceLevel": "",
         "minHours": 2,
         "x": 420,
         "y": 140,

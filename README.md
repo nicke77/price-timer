@@ -7,6 +7,7 @@ A Node-RED node that plans and controls your energy consumption based on hourly 
 *   **Price-based Scheduling**: Automatically finds the cheapest hours to run your appliances.
 *   **Demand Hours**: Specify how many hours your device needs to run per day.
 *   **Price Cap**: Set a maximum price you're willing to pay. The device won't run above this price.
+*   **Price Level**: If the price stays at or below a level for longer than the requested hours, the device runs for that whole stretch.
 *   **Minimum Run Hours**: Ensures your device runs for a minimum number of hours, even if the price is above the cap.
 *   **Flexible Control**: Outputs simple on/off commands that can be used with any device control node (e.g., MQTT, Home Assistant, etc.).
 *   **Informative Output**: Provides a detailed schedule and cost information for monitoring and logging.
@@ -50,6 +51,7 @@ The `price-timer` node has the following configuration properties:
 *   **On-value**: The value to send when the device should turn on (e.g., `on`, `true`, `1`). Overridden by `msg.startValue` when set.
 *   **Off-value**: The value to send when the device should turn off (e.g., `off`, `false`, `0`). Overridden by `msg.stopValue` when set.
 *   **Price cap**: The maximum price at which the device is allowed to run, in the same unit as the price series. Leave empty for no cap.
+*   **Price level**: If the price stays at or below this level for longer than Hours, the device runs for the whole time it is at or below the level. Leave empty to only run the cheapest Hours. Same unit as the price series. Overridden by `msg.priceLevel` when set.
 *   **Min. hours**: The minimum number of hours the device must run, overriding the price cap if necessary.
 
 ## Inputs
@@ -59,6 +61,7 @@ The node is triggered by an incoming message. The following properties on the `m
 *   `msg.prices` (Array | Object): **Required.** A 24-hour price series as a numeric array, or `{ spotprice: [...] }` with that series. Length may be 24 (hourly), 96 (15 minutes), or any other count spanning the same day.
 *   `msg.hours` (Number): *Optional.* Overrides the `Hours` configured in the node.
 *   `msg.priceCap` (Number): *Optional.* Overrides the `Price cap` configured in the node. Same unit as the price series; omit or leave empty for no cap.
+*   `msg.priceLevel` (Number): *Optional.* Overrides the `Price level` configured in the node. If the series is at or below this level for longer than `msg.hours`, every such sample is active. Omit or leave empty to disable.
 *   `msg.minHours` (Number): *Optional.* Overrides the `Min. hours` configured in the node.
 *   `msg.topic` (String): *Optional.* Overrides the `Topic` configured in the node.
 *   `msg.startValue` (*): *Optional.* Overrides the `On-value` configured in the node.
@@ -73,6 +76,9 @@ The node has two outputs:
     *   `msg.payload.nbrOfHours`: The target number of active hours.
     *   `msg.payload.slots`: Indexes into the price series for periods when the device will be active.
     *   `msg.payload.hoursBelowPriceCap`: How many hours of the day are at or below the price cap.
+    *   `msg.payload.priceLevel`: The price level used, or `null` when disabled.
+    *   `msg.payload.hoursBelowPriceLevel`: How many hours are at or below the price level, or `null` when disabled.
+    *   `msg.payload.extended`: `true` when the schedule was lengthened to cover the whole stretch at or below the price level.
     *   `msg.payload.startStop`: A detailed schedule with start and end times.
 
 2.  **Control Output**: The second output sends a message to control your device.
