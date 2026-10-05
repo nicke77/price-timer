@@ -32,10 +32,10 @@ module.exports = function(RED) {
 			}
 			sampleCount = spotprice.length;
 			var samplesPerHour = sampleCount / 24;
-			var priceCap = msg.priceCap != null && msg.priceCap !== '' ? msg.priceCap : config.priceCap;
-			var priceLevel = msg.priceLevel != null && msg.priceLevel !== '' ? msg.priceLevel : config.priceLevel;
+			var priceCap = nodeOrMessage(config.priceCap, msg.priceCap);
+			var priceLevel = nodeOrMessage(config.priceLevel, msg.priceLevel);
 			var minHours = msg.minHours != null && msg.minHours !== '' ? msg.minHours : config.minHours;
-			var topic = msg.topic != null && msg.topic !== '' ? msg.topic : config.topic;
+			var topic = nodeOrMessage(config.topic, msg.topic);
 			var startValue = msg.startValue != null && msg.startValue !== '' ? msg.startValue : config.startValue;
 			var stopValue = msg.stopValue != null && msg.stopValue !== '' ? msg.stopValue : config.stopValue;
 			ret.payload.prices = prices;
@@ -93,6 +93,16 @@ module.exports = function(RED) {
 			}
 			node.send([ret, {"payload":value, "time": now.format("LLLL"), "topic": topic}]);
 		});
+
+		function nodeOrMessage(nodeValue, msgValue) {
+			if (nodeValue != null && nodeValue !== '') {
+				return nodeValue;
+			}
+			if (msgValue != null && msgValue !== '') {
+				return msgValue;
+			}
+			return nodeValue != null ? nodeValue : msgValue;
+		}
 
 		function below_price_cap(arr, priceCap)
 		{

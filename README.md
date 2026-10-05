@@ -46,26 +46,26 @@ The `price-timer` node has the following configuration properties:
 
 *   **Name**: A descriptive name for the node in your flow.
 *   **Prices**: A 24-hour price series of any length (starting from 00:00). This is typically passed in via `msg.prices`.
-*   **Topic**: The topic for the output message (e.g., `myhome/heating`). Overridden by `msg.topic` when set.
-*   **Hours**: The number of hours you want the connected device to be active (wall-clock hours, independent of sample resolution).
-*   **On-value**: The value to send when the device should turn on (e.g., `on`, `true`, `1`). Overridden by `msg.startValue` when set.
-*   **Off-value**: The value to send when the device should turn off (e.g., `off`, `false`, `0`). Overridden by `msg.stopValue` when set.
-*   **Price cap**: The maximum price at which the device is allowed to run, in the same unit as the price series. Leave empty for no cap.
-*   **Price level**: If the price stays at or below this level for longer than Hours, the device runs for the whole time it is at or below the level. Leave empty to only run the cheapest Hours. Same unit as the price series. Overridden by `msg.priceLevel` when set.
-*   **Min. hours**: The minimum number of hours the device must run, overriding the price cap if necessary.
+*   **Topic**: The topic for the output message (e.g., `myhome/heating`). A value entered here overrides `msg.topic`. Leave empty to use `msg.topic`.
+*   **Hours**: The number of hours you want the connected device to be active (wall-clock hours, independent of sample resolution). Leave empty to use `msg.hours`. If both are set, the message value is used.
+*   **On-value**: The value to send when the device should turn on (e.g., `on`, `true`, `1`). Leave empty to use `msg.startValue`. If both are set, the message value is used.
+*   **Off-value**: The value to send when the device should turn off (e.g., `off`, `false`, `0`). Leave empty to use `msg.stopValue`. If both are set, the message value is used.
+*   **Price cap**: The maximum price at which the device is allowed to run, in the same unit as the price series. A value entered here overrides `msg.priceCap`. Leave empty to use `msg.priceCap`, or for no cap if the message omits it.
+*   **Price level**: If the price stays at or below this level for longer than Hours, the device runs for the whole time it is at or below the level. A value entered here overrides `msg.priceLevel`. Leave empty to use `msg.priceLevel`, or to only run the cheapest Hours if the message omits it. Same unit as the price series.
+*   **Min. hours**: The minimum number of hours the device must run, overriding the price cap if necessary. Leave empty to use `msg.minHours`. If both are set, the message value is used.
 
 ## Inputs
 
 The node is triggered by an incoming message. The following properties on the `msg` object are used:
 
 *   `msg.prices` (Array | Object): **Required.** A 24-hour price series as a numeric array, or `{ spotprice: [...] }` with that series. Length may be 24 (hourly), 96 (15 minutes), or any other count spanning the same day.
-*   `msg.hours` (Number): *Optional.* Overrides the `Hours` configured in the node.
-*   `msg.priceCap` (Number): *Optional.* Overrides the `Price cap` configured in the node. Same unit as the price series; omit or leave empty for no cap.
-*   `msg.priceLevel` (Number): *Optional.* Overrides the `Price level` configured in the node. If the series is at or below this level for longer than `msg.hours`, every such sample is active. Omit or leave empty to disable.
-*   `msg.minHours` (Number): *Optional.* Overrides the `Min. hours` configured in the node.
-*   `msg.topic` (String): *Optional.* Overrides the `Topic` configured in the node.
-*   `msg.startValue` (*): *Optional.* Overrides the `On-value` configured in the node.
-*   `msg.stopValue` (*): *Optional.* Overrides the `Off-value` configured in the node.
+*   `msg.hours` (Number): *Optional.* Used when Hours on the node is empty. If both are set, the message value is used.
+*   `msg.priceCap` (Number): *Optional.* Used when Price cap on the node is empty. Same unit as the price series. A Price cap entered on the node overrides this. If both omit it, there is no cap.
+*   `msg.priceLevel` (Number): *Optional.* Used when Price level on the node is empty. If the series is at or below this level for longer than the requested hours, every such sample is active. A Price level entered on the node overrides this. If both omit it, the schedule is the cheapest hours only.
+*   `msg.minHours` (Number): *Optional.* Used when Min. hours on the node is empty. If both are set, the message value is used.
+*   `msg.topic` (String): *Optional.* Used when Topic on the node is empty. A Topic entered on the node overrides this.
+*   `msg.startValue` (*): *Optional.* Used when On-value on the node is empty. If both are set, the message value is used.
+*   `msg.stopValue` (*): *Optional.* Used when Off-value on the node is empty. If both are set, the message value is used.
 
 ## Outputs
 
@@ -83,7 +83,7 @@ The node has two outputs:
 
 2.  **Control Output**: The second output sends a message to control your device.
     *   `msg.payload`: Contains the On-value or Off-value (from the message or the node configuration) depending on the current time and schedule.
-    *   `msg.topic`: The topic from the message or the node configuration.
+    *   `msg.topic`: The topic entered on the node, or from the message when that field is empty.
 
 ## Example Flow
 

@@ -19,7 +19,15 @@
                     }
                 }
             },
-            hours:{value: 8, validate:RED.validators.number() },
+            hours: {
+                value: 8,
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    return RED.validators.number()(v);
+                }
+            },
             topic: {value: ''},
             startValue: {value: 'on'},
             stopValue: {value: 'off'},
@@ -41,7 +49,15 @@
                     return RED.validators.number()(v);
                 }
             },
-            minHours: {value:0, validate:RED.validators.number() }
+            minHours: {
+                value: 0,
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    return RED.validators.number()(v);
+                }
+            }
         },
         inputs:1,
         outputs:2,
@@ -54,25 +70,29 @@
             {
                 type:'json',
                 types:['json'],
-                typeField: '#node-input-prices-type'
+                typeField: '#node-input-prices-type',
+                placeholder: 'uses msg.prices'
             })
             $('#node-input-hours').typedInput(
             {
                 type:'num',
                 types:['num'],
-                typeField: '#node-input-hours-type'
+                typeField: '#node-input-hours-type',
+                placeholder: 'uses msg.hours'
             })
             $('#node-input-startValue').typedInput(
             {
                 type:'str',
                 types:['str','num','bool','json','bin','jsonata','date','env'],
-                typeField: '#node-input-startValue-type'
+                typeField: '#node-input-startValue-type',
+                placeholder: 'uses msg.startValue'
             })
             $('#node-input-stopValue').typedInput(
             {
                 type:'str',
                 types:['str','num','bool','json','bin','jsonata','date','env'],
-                typeField: '#node-input-stopValue-type'
+                typeField: '#node-input-stopValue-type',
+                placeholder: 'uses msg.stopValue'
             })
         }
     });
@@ -85,39 +105,39 @@
     </div>
 
     <div class='form-row'>
-        <label title='Optional default prices. Leave empty to use msg.prices from the input message.' for='node-input-prices'><i class='fa fa-money'></i> Prices</label>
-        <input type='text' id='node-input-prices' placeholder='use msg.prices'>
+        <label title='Optional prices. Leave empty to use msg.prices. If both are set, the message is used.' for='node-input-prices'><i class='fa fa-money'></i> Prices</label>
+        <input type='text' id='node-input-prices' placeholder='uses msg.prices'>
         <input type='hidden' id='node-input-prices-type'>
     </div>
     <div class='form-row'>
-        <label title='The topic the load listens to' for='node-input-topic'><i class='fa fa-tasks'></i> Topic</label>
-        <input type='text' id='node-input-topic' placeholder='my/topic'>
+        <label title='Topic for output 2. A value here overrides msg.topic. Leave empty to use msg.topic.' for='node-input-topic'><i class='fa fa-tasks'></i> Topic</label>
+        <input type='text' id='node-input-topic' placeholder='uses msg.topic'>
     </div>
     <div class='form-row'>
-        <label title='Demanded number of hours.' for='node-input-hours'><i class='fa fa-clock-o'></i> Hours</label>
-        <input type='number' id='node-input-hours' placeholder='0'>
+        <label title='Demanded number of hours. Leave empty to use msg.hours. If both are set, the message is used.' for='node-input-hours'><i class='fa fa-clock-o'></i> Hours</label>
+        <input type='number' id='node-input-hours' placeholder='uses msg.hours'>
     </div>
     <div class='form-row'>
-        <label title='The value that will be sent to <topic> for turning on the load' for='node-input-startvalue'><i class='fa fa-sun-o'></i> On-value</label>
-        <input type='text' id='node-input-startValue' placeholder='on'>
+        <label title='Value sent on output 2 when the load should run. Leave empty to use msg.startValue. If both are set, the message is used.' for='node-input-startvalue'><i class='fa fa-sun-o'></i> On-value</label>
+        <input type='text' id='node-input-startValue' placeholder='uses msg.startValue'>
         <input type='hidden' id='node-input-startValue-type'>
     </div>
     <div class='form-row'>
-        <label title='The value that will be sent to <topic> for shutting off the load' for='node-input-stopvalue'><i class='fa fa-power-off'></i> Off value</label>
-        <input type='text' id='node-input-stopValue'>
+        <label title='Value sent on output 2 when the load should stop. Leave empty to use msg.stopValue. If both are set, the message is used.' for='node-input-stopvalue'><i class='fa fa-power-off'></i> Off value</label>
+        <input type='text' id='node-input-stopValue' placeholder='uses msg.stopValue'>
         <input type='hidden' id='node-input-stopValue-type'>
     </div>
     <div class='form-row'>
-        <label title='Hours over this price will not activate the load unless Min. hours is not reached. Leave empty for no cap. Use the same unit as the price series.' for='node-input-pricecap'><i class='fa fa-money'></i> Price cap</label>
-        <input type='number' id='node-input-priceCap' placeholder='no cap'>
+        <label title='Maximum price at which the load may run. A value here overrides msg.priceCap. Leave empty to use msg.priceCap, or no cap if the message omits it. Same unit as the price series.' for='node-input-pricecap'><i class='fa fa-money'></i> Price cap</label>
+        <input type='number' id='node-input-priceCap' placeholder='uses msg.priceCap'>
     </div>
     <div class='form-row'>
-        <label title='If the price stays at or below this level for longer than Hours, the load runs for the whole time it is at or below the level. Leave empty to only run the cheapest Hours.' for='node-input-pricelevel'><i class='fa fa-money'></i> Price level</label>
-        <input type='number' id='node-input-priceLevel' placeholder='disabled'>
+        <label title='If the price stays at or below this level for longer than Hours, the load runs for the whole time it is at or below the level. A value here overrides msg.priceLevel. Leave empty to use msg.priceLevel, or to run only the cheapest Hours if the message omits it.' for='node-input-pricelevel'><i class='fa fa-money'></i> Price level</label>
+        <input type='number' id='node-input-priceLevel' placeholder='uses msg.priceLevel'>
     </div>
     <div class='form-row'>
-        <label title='Minimum amount of hours that must be active. Overrides price cap.' for='node-input-minhours'><i class='fa fa-clock-o'></i> Min. hours</label>
-        <input type='number' id='node-input-minHours' placeholder='0'>
+        <label title='Minimum amount of hours that must be active. Overrides the price cap. Leave empty to use msg.minHours. If both are set, the message is used.' for='node-input-minhours'><i class='fa fa-clock-o'></i> Min. hours</label>
+        <input type='number' id='node-input-minHours' placeholder='uses msg.minHours'>
     </div>
 </script>
 
@@ -129,19 +149,19 @@
         <dt>prices <span class='property-type'>array | object</span></dt>
         <dd>A 24-hour price series (numeric array, or <code>{ spotprice: [...] }</code>). Prefer this over the optional Prices property on the node.</dd>
         <dt class='optional'>hours <span class='property-type'>number</span></dt>
-        <dd>Overrides the Hours configured on the node.</dd>
+        <dd>Used when Hours on the node is empty. If both are set, this message value is used.</dd>
         <dt class='optional'>topic <span class='property-type'>string</span></dt>
-        <dd>Overrides the Topic configured on the node. Used on output 2.</dd>
+        <dd>Used on output 2 when Topic on the node is empty. A Topic entered on the node overrides this.</dd>
         <dt class='optional'>startValue <span class='property-type'>any</span></dt>
-        <dd>Overrides the On-value configured on the node. Sent as <code>msg.payload</code> on output 2 when the load should run.</dd>
+        <dd>Sent as <code>msg.payload</code> on output 2 when the load should run, if On-value on the node is empty. If both are set, this message value is used.</dd>
         <dt class='optional'>stopValue <span class='property-type'>any</span></dt>
-        <dd>Overrides the Off-value configured on the node. Sent as <code>msg.payload</code> on output 2 when the load should stop.</dd>
+        <dd>Sent as <code>msg.payload</code> on output 2 when the load should stop, if Off-value on the node is empty. If both are set, this message value is used.</dd>
         <dt class='optional'>priceCap <span class='property-type'>number</span></dt>
-        <dd>Overrides the Price cap configured on the node. Same unit as the price series. Empty or omitted means no cap.</dd>
+        <dd>Used when Price cap on the node is empty. Same unit as the price series. If the node and the message both omit it, there is no cap. A Price cap entered on the node overrides this.</dd>
         <dt class='optional'>priceLevel <span class='property-type'>number</span></dt>
-        <dd>Overrides the Price level configured on the node. If the series stays at or below this level for longer than <code>hours</code>, the load runs for every sample at or below the level. Empty or omitted disables this.</dd>
+        <dd>Used when Price level on the node is empty. If the series stays at or below this level for longer than <code>hours</code>, the load runs for every sample at or below the level. If the node and the message both omit it, the load runs only for the cheapest Hours. A Price level entered on the node overrides this.</dd>
         <dt class='optional'>minHours <span class='property-type'>number</span></dt>
-        <dd>Overrides the Min. hours configured on the node. Forces that many hours even above the price cap.</dd>
+        <dd>Used when Min. hours on the node is empty. Forces that many hours even above the price cap. If both are set, this message value is used.</dd>
     </dl>
 
  <h3>Outputs</h3>
@@ -157,13 +177,14 @@
                  <dt>payload <span class='property-type'>any</span></dt>
                  <dd>The On-value or Off-value for the current time.</dd>
                  <dt>topic <span class='property-type'>string</span></dt>
-                 <dd>The topic from the message or the node configuration.</dd>
+                 <dd>The topic entered on the node, or <code>msg.topic</code> when that field is empty.</dd>
              </dl>
          </li>
      </ol>
 
 <h3>Details</h3>
-    <p>If an optional message property is missing, the matching node setting is used for topic, On-value, Off-value, hours, price cap, price level, and min hours.</p>
+    <p>Topic, Price cap, and Price level entered on the node override the matching message properties. Leave those fields empty to use <code>msg.topic</code>, <code>msg.priceCap</code>, and <code>msg.priceLevel</code>.</p>
+    <p>Prices, Hours, On-value, Off-value, and Min. hours still prefer the message when it is set, so existing flows that override those node settings keep working. Leave a field empty to take the value from the message. The editor shows <code>uses msg.…</code> in an empty field.</p>
     <p>Leave Price cap empty for no limit. When set, samples above the cap are skipped unless Min. hours requires them. The cap uses the same unit as the price series.</p>
     <p>Leave Price level empty to always pick the cheapest hours. When it is set and the price is at or below that level for longer than Hours, every such sample is active, including samples above the price cap. If that stretch is not longer than Hours, the usual cheapest-hours schedule is used. Min. hours still forces extra cheapest samples if the extended stretch is shorter than that minimum.</p>
 
