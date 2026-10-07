@@ -25,7 +25,8 @@
     "price-timer.js",
     "price-timer.html",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "examples/"
   ],
   "node-red": {
     "nodes": {

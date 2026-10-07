@@ -12,26 +12,50 @@ module.exports = function(RED) {
 			var ret={};
 			ret.payload={};
 			var prices = msg.prices != null && msg.prices !== '' ? msg.prices : config.prices;
-			if (typeof prices === 'string') {
-				if (prices === '') {
-					prices = null;
-				} else {
-					try {
-						prices = JSON.parse(prices);
-					} catch (e) {
-						node.error('prices must be a JSON array or { spotprice: [...] }', msg);
-						return;
-					}
-				}
+			var spotprice = parsePriceSeries(prices);
+			if (spotprice === false) {
+				node.error('prices must be a JSON array or { spotprice: [...] }', msg);
+				return;
 			}
-			var spotprice = Array.isArray(prices) ? prices : (prices && prices.spotprice);
-			spotprice = spotprice || [];
 			if (!spotprice.length) {
 				node.error('msg.prices (or node Prices) must provide a non-empty 24-hour price series', msg);
 				return;
 			}
 			sampleCount = spotprice.length;
 			var samplesPerHour = sampleCount / 24;
+			var todayKey = now.format('YYYY-MM-DD');
+			if (node.pendingTomorrow && node.pendingTomorrow.date === todayKey)
+			{
+			    if (!samePriceSeries(node.pendingTomorrow.prices, spotprice))
+			    {
+			        node.error('tomorrow prices from yesterday do not match msg.prices; using the newest prices', msg);
+			    }
+			    node.pendingTomorrow = null;
+			}
+			else if (node.pendingTomorrow && node.pendingTomorrow.date < todayKey)
+			{
+			    node.pendingTomorrow = null;
+			}
+			var tomorrowRaw = msg.tomorrowPrices;
+			var tomorrowSeries = null;
+			if (tomorrowRaw != null && tomorrowRaw !== '')
+			{
+			    tomorrowSeries = parsePriceSeries(tomorrowRaw);
+			    if (tomorrowSeries === false)
+			    {
+			        node.error('tomorrowPrices must be a JSON array or { spotprice: [...] }', msg);
+			        return;
+			    }
+			    if (tomorrowSeries.length !== sampleCount)
+			    {
+			        node.error('tomorrowPrices must have the same length as prices', msg);
+			        return;
+			    }
+			    node.pendingTomorrow = {
+			        date: now.clone().add(1, 'day').format('YYYY-MM-DD'),
+			        prices: tomorrowSeries.slice()
+			    };
+			}
 			var priceCap = nodeOrMessage(config.priceCap, msg.priceCap);
 			var priceLevel = nodeOrMessage(config.priceLevel, msg.priceLevel);
 			var minHours = msg.minHours != null && msg.minHours !== '' ? msg.minHours : config.minHours;
@@ -44,14 +68,46 @@ module.exports = function(RED) {
 			var hasPriceLevel = priceLevel != null && priceLevel !== '';
 			ret.payload.priceLevel = hasPriceLevel ? priceLevel : null;
 			ret.payload.min_hours = minHours || 0;
-			var samplesBelowPriceCap = below_price_cap(spotprice, ret.payload.price_cap);
+			var timeSpanRaw = msg.timeSpan != null && msg.timeSpan !== '' ? msg.timeSpan : config.timeSpan;
+			var windowIndexes = null;
+			var parsedSpan = null;
+			var schedulePrices = spotprice;
+			ret.payload.tomorrowPrices = null;
+			if (timeSpanRaw != null && timeSpanRaw !== '')
+			{
+			    parsedSpan = parseTimeSpan(timeSpanRaw);
+			    if (!parsedSpan)
+			    {
+			        node.error('time span must be a range like 08:00-16:00', msg);
+			        return;
+			    }
+			    windowIndexes = indexesInsideSpan(sampleCount, parsedSpan.from, parsedSpan.to);
+			    ret.payload.timeSpan = formatTimeSpan(parsedSpan);
+			    if (!windowIndexes.length)
+			    {
+			        node.warn('time span does not cover any price samples', msg);
+			    }
+			    if (tomorrowSeries && parsedSpan.from > parsedSpan.to)
+			    {
+			        var merged = mergeOvernightPrices(spotprice, tomorrowSeries, windowIndexes);
+			        schedulePrices = merged.prices;
+			        windowIndexes = merged.indexes;
+			        ret.payload.tomorrowPrices = tomorrowRaw;
+			    }
+			}
+			else
+			{
+			    ret.payload.timeSpan = null;
+			}
+			var poolCount = windowIndexes ? windowIndexes.length : sampleCount;
+			var samplesBelowPriceCap = below_price_cap(schedulePrices, ret.payload.price_cap, windowIndexes);
 			ret.payload.hoursBelowPriceCap = samplesBelowPriceCap / samplesPerHour;
-			var levelIndexes = hasPriceLevel ? indexesAtOrBelow(spotprice, priceLevel) : [];
+			var levelIndexes = hasPriceLevel ? indexesAtOrBelow(schedulePrices, priceLevel, windowIndexes) : [];
 			ret.payload.hoursBelowPriceLevel = hasPriceLevel ? levelIndexes.length / samplesPerHour : null;
 			var requestedSamples = Math.round(Number(ret.payload.nbrOfHours) * samplesPerHour);
-			if (requestedSamples > sampleCount)
+			if (requestedSamples > poolCount)
 			{
-			    requestedSamples = sampleCount;
+			    requestedSamples = poolCount;
 			}
 			if (requestedSamples < 0)
 			{
@@ -61,12 +117,12 @@ module.exports = function(RED) {
 			if (ret.payload.extended)
 			{
 			    var minSamples = Math.round(Number(ret.payload.min_hours) * samplesPerHour);
-			    if (minSamples > sampleCount)
+			    if (minSamples > poolCount)
 			    {
-			        minSamples = sampleCount;
+			        minSamples = poolCount;
 			    }
 			    ret.payload.slots = levelIndexes.length < minSamples
-			        ? padCheapest(spotprice, levelIndexes, minSamples)
+			        ? padCheapest(schedulePrices, levelIndexes, minSamples, windowIndexes)
 			        : levelIndexes.slice();
 			}
 			else
@@ -77,11 +133,11 @@ module.exports = function(RED) {
 			        hours = ret.payload.min_hours;
 			    }
 			    var samples = Math.round(hours * samplesPerHour);
-			    if (samples > sampleCount)
+			    if (samples > poolCount)
 			    {
-			        samples = sampleCount;
+			        samples = poolCount;
 			    }
-			    ret.payload.slots = getLowestIndexes(spotprice, samples);
+			    ret.payload.slots = getLowestIndexes(schedulePrices, samples, windowIndexes);
 			}
 			ret.payload.startStop=times(ret.payload.slots, topic);
 			ret.startStopArray = startStopArray(ret.payload.slots);
@@ -91,8 +147,118 @@ module.exports = function(RED) {
 			{
 			    value = startValue;
 			}
-			node.send([ret, {"payload":value, "time": now.format("LLLL"), "topic": topic}]);
+			var control = {"payload":value, "time": now.format("LLLL"), "topic": topic};
+			if (parsedSpan && (isChecked(config.onlyDuringSpan) || isChecked(config.stopAtSpanEnd)))
+			{
+			    var minuteOfDay = now.hours() * 60 + now.minutes();
+			    var insideSpan = minuteInsideSpan(minuteOfDay, parsedSpan.from, parsedSpan.to);
+			    var leftSpan = node.spanInside === true && !insideSpan;
+			    node.spanInside = insideSpan;
+			    if (!insideSpan)
+			    {
+			        if (isChecked(config.stopAtSpanEnd) && leftSpan)
+			        {
+			            control.payload = stopValue;
+			        }
+			        else if (isChecked(config.onlyDuringSpan))
+			        {
+			            control = null;
+			        }
+			    }
+			}
+			else
+			{
+			    node.spanInside = null;
+			}
+			node.send([ret, control]);
 		});
+
+		function isChecked(value)
+		{
+		    return value === true || value === 'true';
+		}
+
+		function minuteInsideSpan(minuteOfDay, fromMin, toMin)
+		{
+		    if (fromMin < toMin)
+		    {
+		        return minuteOfDay >= fromMin && minuteOfDay < toMin;
+		    }
+		    return minuteOfDay >= fromMin || minuteOfDay < toMin;
+		}
+
+		function parsePriceSeries(value)
+		{
+		    if (typeof value === 'string')
+		    {
+		        if (value === '')
+		        {
+		            return [];
+		        }
+		        try
+		        {
+		            value = JSON.parse(value);
+		        }
+		        catch (e)
+		        {
+		            return false;
+		        }
+		    }
+		    var series = Array.isArray(value) ? value : (value && value.spotprice);
+		    if (series == null)
+		    {
+		        return [];
+		    }
+		    if (!Array.isArray(series))
+		    {
+		        return false;
+		    }
+		    return series;
+		}
+
+		function samePriceSeries(a, b)
+		{
+		    if (!a || !b || a.length !== b.length)
+		    {
+		        return false;
+		    }
+		    for (let i = 0; i < a.length; i++)
+		    {
+		        if (Number(a[i]) !== Number(b[i]))
+		        {
+		            return false;
+		        }
+		    }
+		    return true;
+		}
+
+		function mergeOvernightPrices(todayArr, tomorrowArr, spanIndexes)
+		{
+		    var effective = todayArr.slice();
+		    var indexes = [];
+		    var count = todayArr.length;
+		    var nowMin = now.hours() * 60 + now.minutes() + now.seconds() / 60;
+		    for (let n = 0; n < spanIndexes.length; n++)
+		    {
+		        var i = spanIndexes[n];
+		        var sampleStart = i * 1440 / count;
+		        var sampleEnd = (i + 1) * 1440 / count;
+		        if (sampleEnd > nowMin)
+		        {
+		            indexes.push(i);
+		        }
+		        else
+		        {
+		            var minutesUntilTomorrowStart = (1440 - nowMin) + sampleStart;
+		            if (minutesUntilTomorrowStart < 1440)
+		            {
+		                effective[i] = tomorrowArr[i];
+		                indexes.push(i);
+		            }
+		        }
+		    }
+		    return {prices: effective, indexes: indexes};
+		}
 
 		function nodeOrMessage(nodeValue, msgValue) {
 			if (nodeValue != null && nodeValue !== '') {
@@ -104,9 +270,92 @@ module.exports = function(RED) {
 			return nodeValue != null ? nodeValue : msgValue;
 		}
 
-		function below_price_cap(arr, priceCap)
+		function parseClock(text)
+		{
+		    var match = /^(\d{1,2}):(\d{2})$/.exec(text);
+		    if (!match)
+		    {
+		        return null;
+		    }
+		    var hours = Number(match[1]);
+		    var minutes = Number(match[2]);
+		    if (minutes > 59 || hours > 24 || (hours === 24 && minutes !== 0))
+		    {
+		        return null;
+		    }
+		    return hours * 60 + minutes;
+		}
+
+		function parseTimeSpan(value)
+		{
+		    var match = /^\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*$/.exec(String(value));
+		    if (!match)
+		    {
+		        return null;
+		    }
+		    var from = parseClock(match[1]);
+		    var to = parseClock(match[2]);
+		    if (from == null || to == null || from === to || from === 1440)
+		    {
+		        return null;
+		    }
+		    return {from: from, to: to};
+		}
+
+		function formatClock(minutes)
+		{
+		    if (minutes === 1440)
+		    {
+		        return '24:00';
+		    }
+		    var hours = Math.floor(minutes / 60);
+		    var mins = minutes % 60;
+		    return (hours < 10 ? '0' : '') + hours + ':' + (mins < 10 ? '0' : '') + mins;
+		}
+
+		function formatTimeSpan(span)
+		{
+		    return formatClock(span.from) + '-' + formatClock(span.to);
+		}
+
+		function indexesInsideSpan(count, fromMin, toMin)
+		{
+		    var indexes = [];
+		    for (let i = 0; i < count; i++)
+		    {
+		        var start = i * 1440;
+		        var end = (i + 1) * 1440;
+		        var inside;
+		        if (fromMin < toMin)
+		        {
+		            inside = start >= fromMin * count && end <= toMin * count;
+		        }
+		        else
+		        {
+		            inside = start >= fromMin * count || end <= toMin * count;
+		        }
+		        if (inside)
+		        {
+		            indexes.push(i);
+		        }
+		    }
+		    return indexes;
+		}
+
+		function below_price_cap(arr, priceCap, allowed)
 		{
 		    var ret = 0;
+		    if (allowed)
+		    {
+		        for (let i = 0; i < allowed.length; i++)
+		        {
+		            if (arr[allowed[i]] <= priceCap)
+		            {
+		                ret++;
+		            }
+		        }
+		        return ret;
+		    }
 		    for(let i=0; i<arr.length; i++)
 		    {
 				if (arr[i] <= priceCap)
@@ -117,20 +366,21 @@ module.exports = function(RED) {
 		    return ret;
 		}
 
-		function indexesAtOrBelow(arr, level)
+		function indexesAtOrBelow(arr, level, allowed)
 		{
 		    var ret = [];
-		    for (let i = 0; i < arr.length; i++)
+		    var indexes = allowed || arr.map(function(_, i) { return i; });
+		    for (let i = 0; i < indexes.length; i++)
 		    {
-		        if (arr[i] <= level)
+		        if (arr[indexes[i]] <= level)
 		        {
-		            ret.push(i);
+		            ret.push(indexes[i]);
 		        }
 		    }
 		    return ret;
 		}
 
-		function padCheapest(arr, selected, target)
+		function padCheapest(arr, selected, target, allowed)
 		{
 		    var chosen = {};
 		    var result = selected.slice();
@@ -139,9 +389,16 @@ module.exports = function(RED) {
 		        chosen[result[i]] = true;
 		    }
 		    var order = [];
-		    for (let i = 0; i < arr.length; i++)
+		    if (allowed)
 		    {
-		        order.push(i);
+		        order = allowed.slice();
+		    }
+		    else
+		    {
+		        for (let i = 0; i < arr.length; i++)
+		        {
+		            order.push(i);
+		        }
 		    }
 		    order.sort(function(a, b) {
 		        if (arr[a] !== arr[b])
@@ -163,9 +420,28 @@ module.exports = function(RED) {
 		}
 
 
-		function getLowestIndexes(arr, len) {
+		function getLowestIndexes(arr, len, allowed) {
 		// Returns a sorted array with <len> indexes of the lowest values in arr
 		    let array = Array.from(arr);
+		    if (allowed)
+		    {
+		        var allow = {};
+		        for (let i = 0; i < allowed.length; i++)
+		        {
+		            allow[allowed[i]] = true;
+		        }
+		        for (let i = 0; i < array.length; i++)
+		        {
+		            if (!allow[i])
+		            {
+		                array[i] = Infinity;
+		            }
+		        }
+		        if (len > allowed.length)
+		        {
+		            len = allowed.length;
+		        }
+		    }
 		    var lowIndex = new Array(len).fill(0);
 			for (let k = 0; k < len; k++) {
 			    for (let i = 0; i < array.length; i++)

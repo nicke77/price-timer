@@ -57,7 +57,32 @@
                     }
                     return RED.validators.number()(v);
                 }
-            }
+            },
+            timeSpan: {
+                value: '',
+                validate: function (v) {
+                    if (v === '' || v === undefined || v === null) {
+                        return true;
+                    }
+                    var match = /^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$/.exec(String(v));
+                    if (!match) {
+                        return false;
+                    }
+                    function minutes(hour, minute) {
+                        hour = Number(hour);
+                        minute = Number(minute);
+                        if (minute > 59 || hour > 24 || (hour === 24 && minute !== 0)) {
+                            return null;
+                        }
+                        return hour * 60 + minute;
+                    }
+                    var from = minutes(match[1], match[2]);
+                    var to = minutes(match[3], match[4]);
+                    return from != null && to != null && from !== to && from !== 1440;
+                }
+            },
+            onlyDuringSpan: {value: false},
+            stopAtSpanEnd: {value: false}
         },
         inputs:1,
         outputs:2,
@@ -118,6 +143,20 @@
         <input type='number' id='node-input-hours' placeholder='uses msg.hours'>
     </div>
     <div class='form-row'>
+        <label title='Only pick hours inside this range of the price day. Example: 08:00-16:00 with Hours 2 uses the 2 cheapest hours between 08:00 and 16:00. The end time is exclusive. A range that passes midnight, such as 22:00-06:00, is allowed. Leave empty to use the full day, or msg.timeSpan. If both are set, the message is used.' for='node-input-timeSpan'><i class='fa fa-clock-o'></i> Time span</label>
+        <input type='text' id='node-input-timeSpan' placeholder='uses msg.timeSpan'>
+    </div>
+    <div class='form-row'>
+        <label for='node-input-onlyDuringSpan'></label>
+        <input type='checkbox' id='node-input-onlyDuringSpan' style='display:inline-block;width:auto;vertical-align:top;'>
+        <label for='node-input-onlyDuringSpan' title='Send output 2 only while the current time is inside Time span. Outside that range, output 2 sends nothing, so other price-timer nodes can control the same load.' style='width:auto;'>Only during span</label>
+    </div>
+    <div class='form-row'>
+        <label for='node-input-stopAtSpanEnd'></label>
+        <input type='checkbox' id='node-input-stopAtSpanEnd' style='display:inline-block;width:auto;vertical-align:top;'>
+        <label for='node-input-stopAtSpanEnd' title='Send the Off-value once on the first message after Time span ends, then stay silent outside the span when Only during span is enabled. Use this when the next span does not start immediately.' style='width:auto;'>Stop when span ends</label>
+    </div>
+    <div class='form-row'>
         <label title='Value sent on output 2 when the load should run. Leave empty to use msg.startValue. If both are set, the message is used.' for='node-input-startvalue'><i class='fa fa-sun-o'></i> On-value</label>
         <input type='text' id='node-input-startValue' placeholder='uses msg.startValue'>
         <input type='hidden' id='node-input-startValue-type'>
@@ -150,6 +189,10 @@
         <dd>A 24-hour price series (numeric array, or <code>{ spotprice: [...] }</code>). Prefer this over the optional Prices property on the node.</dd>
         <dt class='optional'>hours <span class='property-type'>number</span></dt>
         <dd>Used when Hours on the node is empty. If both are set, this message value is used.</dd>
+        <dt class='optional'>timeSpan <span class='property-type'>string</span></dt>
+        <dd>Used when Time span on the node is empty. A range such as <code>08:00-16:00</code> limits the schedule to samples fully inside that part of the price day. The end time is exclusive. <code>22:00-06:00</code> passes midnight. If both are set, this message value is used. If both are empty, the whole day is used.</dd>
+        <dt class='optional'>tomorrowPrices <span class='property-type'>array | object</span></dt>
+        <dd>Optional next-day price series in the same shape and length as <code>prices</code>. Used only when Time span crosses midnight. Samples that have already ended today take their price from this series when the next occurrence starts within 24 hours. The node remembers the series and, after midnight, compares it to the new <code>msg.prices</code>. A mismatch is logged as an error and the newest prices are used.</dd>
         <dt class='optional'>topic <span class='property-type'>string</span></dt>
         <dd>Used on output 2 when Topic on the node is empty. A Topic entered on the node overrides this.</dd>
         <dt class='optional'>startValue <span class='property-type'>any</span></dt>
@@ -169,13 +212,13 @@
          <li>Information output
              <dl class='message-properties'>
                  <dt>payload <span class='property-type'>object</span></dt>
-                 <dd>Schedule details: prices, requested hours, selected slots, hours below the price cap, hours below the price level, whether the schedule was extended, and start/stop windows.</dd>
+                 <dd>Schedule details: prices, tomorrow prices when an overnight span used them, requested hours, time span, selected slots, hours below the price cap, hours below the price level, whether the schedule was extended, and start/stop windows.</dd>
              </dl>
          </li>
          <li>Control output
              <dl class='message-properties'>
                  <dt>payload <span class='property-type'>any</span></dt>
-                 <dd>The On-value or Off-value for the current time.</dd>
+                 <dd>The On-value or Off-value for the current time. With <b>Only during span</b>, no message is sent while the current time is outside Time span. With <b>Stop when span ends</b>, the first message after the span ends sends the Off-value.</dd>
                  <dt>topic <span class='property-type'>string</span></dt>
                  <dd>The topic entered on the node, or <code>msg.topic</code> when that field is empty.</dd>
              </dl>
@@ -184,7 +227,10 @@
 
 <h3>Details</h3>
     <p>Topic, Price cap, and Price level entered on the node override the matching message properties. Leave those fields empty to use <code>msg.topic</code>, <code>msg.priceCap</code>, and <code>msg.priceLevel</code>.</p>
-    <p>Prices, Hours, On-value, Off-value, and Min. hours still prefer the message when it is set, so existing flows that override those node settings keep working. Leave a field empty to take the value from the message. The editor shows <code>uses msg.…</code> in an empty field.</p>
+    <p>Prices, Hours, Time span, On-value, Off-value, and Min. hours still prefer the message when it is set, so existing flows that override those node settings keep working. Leave a field empty to take the value from the message. The editor shows <code>uses msg.…</code> in an empty field.</p>
+    <p>Leave Time span empty to use the whole price day. When it is set, only samples that fall entirely inside the range are eligible. Hours, the price cap, the price level, and Min. hours then apply inside that range. <code>08:00-16:00</code> with Hours <code>2</code> runs the 2 cheapest hours between 08:00 and 16:00. If Hours is longer than the range, the schedule is limited to the range.</p>
+    <p>When Time span crosses midnight and <code>msg.tomorrowPrices</code> is set, hours that have already ended today are priced from tomorrow if they start within the next 24 hours. Evening hours still use <code>msg.prices</code>. Daytime spans ignore tomorrow prices. After midnight the node checks that the remembered tomorrow series matches the new <code>msg.prices</code>. On a mismatch it logs an error and continues with the newest series.</p>
+    <p><b>Only during span</b> limits output 2 to the time span. Outside it, that output sends nothing, so several price-timer nodes can share one load without turning each other off. Output 1 still sends the schedule. <b>Stop when span ends</b> sends the Off-value on the first message after the span ends. Enable it when the next span does not start straight away, so the load is turned off in the gap. Leave it off when spans meet, such as <code>08:00-16:00</code> and <code>16:00-08:00</code>, because the next node takes over.</p>
     <p>Leave Price cap empty for no limit. When set, samples above the cap are skipped unless Min. hours requires them. The cap uses the same unit as the price series.</p>
     <p>Leave Price level empty to always pick the cheapest hours. When it is set and the price is at or below that level for longer than Hours, every such sample is active, including samples above the price cap. If that stretch is not longer than Hours, the usual cheapest-hours schedule is used. Min. hours still forces extra cheapest samples if the extended stretch is shorter than that minimum.</p>
 

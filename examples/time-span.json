@@ -1,0 +1,241 @@
+[
+    {
+        "id": "timespanexample",
+        "type": "tab",
+        "label": "price-timer time span",
+        "disabled": false,
+        "info": "Click sample prices. The whole-day node plans 2 hours for myhome/washing-machine. The 08:00-16:00 and 16:00-08:00 nodes both control myhome/boiler and only send output 2 during their own span."
+    },
+    {
+        "id": "timespancomment",
+        "type": "comment",
+        "z": "timespanexample",
+        "name": "2 cheapest hours whole day",
+        "info": "The sample series is cheapest at 03:00 (80) and 04:00 (90).\n\nClick \"sample prices\".\n\nWhole day runs 03:00-05:00 on topic myhome/washing-machine, from msg.topic.\n\nOutput 1 is the schedule. Output 2 is on or off for the current time.",
+        "x": 460,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "62f99c795b8f8f14",
+        "type": "comment",
+        "z": "timespanexample",
+        "name": "2 cheapest hours during night and 2 cheapest hours during daytime.",
+        "info": "Today's series is cheapest at 03:00 (80) and 04:00 (90). msg.tomorrowPrices is cheapest at 01:00 (50) and 02:00 (60).\n\nClick \"sample prices\".\n\nWhen you trigger after 05:00, the 16:00-08:00 node prices morning hours from tomorrow, so it runs 01:00-03:00. Before those hours have ended today, it still uses today's morning prices (03:00-05:00).\nThe 08:00-16:00 node ignores tomorrow prices and runs 11:00-12:00 and 14:00-15:00.\n\nBoth nodes use topic myhome/boiler, which overrides myhome/washing-machine from the inject node. Both have Only during span enabled, and both control outputs join one debug node. Outside its span, a node sends nothing on output 2, so they do not turn each other off.\n\nStop when span ends is off because 16:00 and 08:00 meet. Enable it when there is a gap between spans, so the load gets one off command as a span finishes.\n\nOutput 1 is the schedule. Output 2 is on or off for the current time.\nTime span is exclusive at the end, so 08:00-16:00 covers 08:00 up to 16:00.",
+        "x": 580,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "timespaninject",
+        "type": "inject",
+        "z": "timespanexample",
+        "name": "sample prices",
+        "props": [
+            {
+                "p": "prices",
+                "v": "[200,150,100,80,90,120,300,500,800,600,400,350,420,380,300,450,900,1100,1000,850,700,550,400,250]",
+                "vt": "json"
+            },
+            {
+                "p": "tomorrowPrices",
+                "v": "[180,50,60,110,130,140,320,520,780,610,410,360,430,390,310,460,920,1080,990,860,710,540,390,240]",
+                "vt": "json"
+            },
+            {
+                "p": "topic",
+                "v": "myhome/washing-machine",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "myhome/washing-machine",
+        "x": 170,
+        "y": 200,
+        "wires": [
+            [
+                "timespanwholeday",
+                "timespanwindow",
+                "b0052623ede5c190"
+            ]
+        ]
+    },
+    {
+        "id": "timespanwholeday",
+        "type": "price-timer",
+        "z": "timespanexample",
+        "name": "whole day",
+        "prices": "",
+        "prices-type": "json",
+        "hours": 2,
+        "topic": "",
+        "startValue": "on",
+        "startValue-type": "str",
+        "stopValue": "off",
+        "stopValue-type": "str",
+        "priceCap": "",
+        "priceLevel": "",
+        "minHours": 0,
+        "timeSpan": "",
+        "onlyDuringSpan": false,
+        "stopAtSpanEnd": false,
+        "x": 430,
+        "y": 160,
+        "wires": [
+            [
+                "timespandebugday"
+            ],
+            [
+                "timespancontrolday"
+            ]
+        ]
+    },
+    {
+        "id": "b0052623ede5c190",
+        "type": "price-timer",
+        "z": "timespanexample",
+        "name": "16:00-08:00",
+        "prices": "",
+        "prices-type": "json",
+        "hours": 2,
+        "topic": "myhome/boiler",
+        "startValue": "on",
+        "startValue-type": "str",
+        "stopValue": "off",
+        "stopValue-type": "str",
+        "priceCap": "",
+        "priceLevel": "",
+        "minHours": 0,
+        "timeSpan": "16:00-08:00",
+        "onlyDuringSpan": true,
+        "stopAtSpanEnd": false,
+        "x": 420,
+        "y": 340,
+        "wires": [
+            [
+                "78db84ca50a8ae83"
+            ],
+            [
+                "timespancontrolspan"
+            ]
+        ]
+    },
+    {
+        "id": "timespanwindow",
+        "type": "price-timer",
+        "z": "timespanexample",
+        "name": "08:00-16:00",
+        "prices": "",
+        "prices-type": "json",
+        "hours": 2,
+        "topic": "myhome/boiler",
+        "startValue": "on",
+        "startValue-type": "str",
+        "stopValue": "off",
+        "stopValue-type": "str",
+        "priceCap": "",
+        "priceLevel": "",
+        "minHours": 0,
+        "timeSpan": "08:00-16:00",
+        "onlyDuringSpan": true,
+        "stopAtSpanEnd": false,
+        "x": 420,
+        "y": 400,
+        "wires": [
+            [
+                "timespandebugspan"
+            ],
+            [
+                "timespancontrolspan"
+            ]
+        ]
+    },
+    {
+        "id": "timespandebugday",
+        "type": "debug",
+        "z": "timespanexample",
+        "name": "schedule: whole day",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 730,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "timespancontrolday",
+        "type": "debug",
+        "z": "timespanexample",
+        "name": "on/off: whole day",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 720,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "78db84ca50a8ae83",
+        "type": "debug",
+        "z": "timespanexample",
+        "name": "schedule: 16:00-08:00",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 720,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "timespandebugspan",
+        "type": "debug",
+        "z": "timespanexample",
+        "name": "schedule: 08:00-16:00",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 720,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "timespancontrolspan",
+        "type": "debug",
+        "z": "timespanexample",
+        "name": "on/off: both periods",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 710,
+        "y": 440,
+        "wires": []
+    }
+]
